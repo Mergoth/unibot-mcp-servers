@@ -1,0 +1,186 @@
+name: Build and Deploy Google Calendar MCP
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mcp-servers/google-calendar/**'
+      - '.github/workflows/**'
+      - 'infra/terraform/**'
+
+env:
+  PYTHON_VERSION: "3.12"
+  APP_NAME: "google-calendar-mcp"
+  SERVICE_PATH: "mcp-servers/google-calendar"
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Install dependencies
+        run: |
+          uv pip install -r ${{ env.SERVICE_PATH }}/requirements.txt
+          uv pip install pytest pytest-asyncio mcp
+
+      - name: Run tests
+        env: 
+            PYTHONPATH: ${{ github.workspace }}/${{ env.SERVICE_PATH }}
+        run: |
+          # The test file imports 'main' so we need PYTHONPATH setup or run from directory
+          uv run --with google-api-python-client --with google-auth --with mcp --with fastapi --with pytest-asyncio pytest tests/test_google_calendar_mcp.py
+
+  build-deploy-test:
+    name: Build & Deploy to TEST
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    environment: TEST
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+            project_id: ${{ vars.GCP_PROJECT }}
+
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker gcr.io
+
+      - name: Build and Push Docker Image
+        id: build
+        run: |
+          IMAGE_TAG="pr-${{ github.event.pull_request.number }}-${{ github.sha }}"
+          IMAGE_URI="gcr.io/${{ env.GCP_PROJECT }}/${{ env.APP_NAME }}:${IMAGE_TAG}"
+          
+          echo "Building ${IMAGE_URI}..."
+          docker build -t ${IMAGE_URI} ${{ env.SERVICE_PATH }}
+          docker push ${IMAGE_URI}
+          
+          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: infra/terraform/envs/test
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/terraform/envs/test
+        run: |
+          terraform apply -auto-approve \
+            -var="project_id=${{ env.GCP_PROJECT }}" \
+            -var="container_image=${{ steps.build.outputs.image_uri }}"
+
+      - name: Get Service URL
+        id: get-url
+        working-directory: infra/terraform/envs/test
+        run: |
+          SERVICE_URL=$(terraform output -raw cloudrun_service_url)
+          echo "Deployed successfully to: ${SERVICE_URL}"
+          echo "service_url=${SERVICE_URL}" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀 Deployed to TEST environment!\nURL: ${{ steps.get-url.outputs.service_url }}'
+            })
+
+  build-deploy-prod:
+    name: Build & Deploy to PROD
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    environment: PROD
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+            project_id: ${{ vars.GCP_PROJECT }}
+
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker gcr.io
+
+      - name: Build and Push Docker Image
+        id: build
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          IMAGE_URI="gcr.io/${{ env.GCP_PROJECT }}/${{ env.APP_NAME }}:${IMAGE_TAG}"
+          LATEST_URI="gcr.io/${{ env.GCP_PROJECT }}/${{ env.APP_NAME }}:latest"
+          
+          echo "Building ${IMAGE_URI}..."
+          docker build -t ${IMAGE_URI} -t ${LATEST_URI} ${{ env.SERVICE_PATH }}
+          docker push ${IMAGE_URI}
+          docker push ${LATEST_URI}
+          
+          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: infra/terraform/envs/prod
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/terraform/envs/prod
+        run: |
+          terraform apply -auto-approve \
+            -var="project_id=${{ env.GCP_PROJECT }}" \
+            -var="container_image=${{ steps.build.outputs.image_uri }}"
+
+      - name: Get Service URL
+        working-directory: infra/terraform/envs/prod
+        run: |
+          SERVICE_URL=$(terraform output -raw cloudrun_service_url)
+          echo "Deployed successfully to: ${SERVICE_URL}"
