@@ -6,7 +6,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir poetry==2.1.1
 
 # Copy repository config
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml poetry.lock README.md ./
 
 # Copy the unibot_mcp_servers sources so poetry can install it as a package
 COPY src ./src
