@@ -23,4 +23,4 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Command to run the server
-CMD ["sh", "-c", "fastmcp run mcp-servers/google-calendar/main.py:mcp --host 0.0.0.0 --port $PORT --transport sse"]
+CMD ["sh", "-c", "fastmcp run main.py:mcp --host 0.0.0.0 --port $PORT --transport sse"]
