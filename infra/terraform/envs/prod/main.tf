@@ -47,10 +47,4 @@ module "cloudrun" {
   allow_public_access   = true # MCP server relies on IAM auth
 
   env_vars = {}
-  
-  # Note: To enable Service Account Key Auth as per user request:
-  # 1. Provide GOOGLE_APPLICATION_CREDENTIALS path in env_vars
-  # 2. Add the file content as a Secret in GCP
-  # 3. Use secret_env_vars to map it (but this module supports env vars, not file mounts)
-  # For now, we deploy the infrastructure. The user must manually configure the secret and update this file or use ADC.
 }

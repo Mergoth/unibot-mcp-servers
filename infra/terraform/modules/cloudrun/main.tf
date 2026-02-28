@@ -56,17 +56,6 @@ resource "google_cloud_run_v2_service" "api" {
         period_seconds        = 10
         failure_threshold     = 3
       }
-
-      # Liveness probe
-      liveness_probe {
-        tcp_socket {
-          port = 8080
-        }
-        initial_delay_seconds = 30
-        timeout_seconds       = 3
-        period_seconds        = 30
-        failure_threshold     = 3
-      }
     }
 
     scaling {
