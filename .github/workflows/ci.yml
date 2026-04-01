@@ -2,11 +2,16 @@ name: Build and Deploy Google Calendar MCP
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master, development ]
     paths:
       - 'mcp-servers/google-calendar/**'
       - '.github/workflows/**'
       - 'infra/terraform/**'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - 'src/**'
+  pull_request:
+    branches: [ master, development ]
 
 env:
   PYTHON_VERSION: "3.12"
@@ -26,33 +31,34 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v2
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
       - name: Install dependencies
-        run: |
-          uv pip install -r ${{ env.SERVICE_PATH }}/requirements.txt
-          uv pip install pytest pytest-asyncio mcp
+        run: poetry install --no-interaction
 
-      - name: Run tests
-        env: 
+      - name: Run unit tests
+        env:
             PYTHONPATH: ${{ github.workspace }}/${{ env.SERVICE_PATH }}
-        run: |
-          # The test file imports 'main' so we need PYTHONPATH setup or run from directory
-          uv run --with google-api-python-client --with google-auth --with mcp --with fastapi --with pytest-asyncio pytest tests/test_google_calendar_mcp.py
+        run: poetry run pytest --ignore=tests/test_smoke_google_calendar.py
 
   build-deploy-test:
     name: Build & Deploy to TEST
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'pull_request'
+    if: github.ref == 'refs/heads/development'
     environment: TEST
     permissions:
       contents: read
       id-token: write
-      pull-requests: write
     env:
       GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+    outputs:
+      service_url: ${{ steps.get-url.outputs.service_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,13 +80,13 @@ jobs:
       - name: Build and Push Docker Image
         id: build
         run: |
-          IMAGE_TAG="pr-${{ github.event.pull_request.number }}-${{ github.sha }}"
+          IMAGE_TAG="dev-${{ github.sha }}"
           IMAGE_URI="gcr.io/${{ env.GCP_PROJECT }}/${{ env.APP_NAME }}:${IMAGE_TAG}"
-          
+
           echo "Building ${IMAGE_URI}..."
-          docker build -t ${IMAGE_URI} ${{ env.SERVICE_PATH }}
+          docker build -t ${IMAGE_URI} -f ${{ env.SERVICE_PATH }}/Dockerfile .
           docker push ${IMAGE_URI}
-          
+
           echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
 
       - name: Setup Terraform
@@ -108,28 +114,50 @@ jobs:
           echo "Deployed successfully to: ${SERVICE_URL}"
           echo "service_url=${SERVICE_URL}" >> $GITHUB_OUTPUT
 
-      - name: Comment on PR
-        uses: actions/github-script@v7
+  smoke-test-test:
+    name: Smoke Tests (TEST)
+    runs-on: ubuntu-latest
+    needs: build-deploy-test
+    environment: TEST
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '🚀 Deployed to TEST environment!\nURL: ${{ steps.get-url.outputs.service_url }}'
-            })
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run smoke tests
+        env:
+          MCP_SERVER_URL: ${{ needs.build-deploy-test.outputs.service_url }}/sse
+          SA_KEY_B64: ${{ secrets.SA_KEY_B64 }}
+        run: poetry run pytest tests/test_smoke_google_calendar.py -v
 
   build-deploy-prod:
     name: Build & Deploy to PROD
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main'
-    environment: PROD
+    environment:
+      name: PROD
     permissions:
       contents: read
       id-token: write
     env:
       GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+    outputs:
+      service_url: ${{ steps.get-url.outputs.service_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -154,12 +182,12 @@ jobs:
           IMAGE_TAG="${{ github.sha }}"
           IMAGE_URI="gcr.io/${{ env.GCP_PROJECT }}/${{ env.APP_NAME }}:${IMAGE_TAG}"
           LATEST_URI="gcr.io/${{ env.GCP_PROJECT }}/${{ env.APP_NAME }}:latest"
-          
+
           echo "Building ${IMAGE_URI}..."
-          docker build -t ${IMAGE_URI} -t ${LATEST_URI} ${{ env.SERVICE_PATH }}
+          docker build -t ${IMAGE_URI} -t ${LATEST_URI} -f ${{ env.SERVICE_PATH }}/Dockerfile .
           docker push ${IMAGE_URI}
           docker push ${LATEST_URI}
-          
+
           echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
 
       - name: Setup Terraform
@@ -180,7 +208,39 @@ jobs:
             -var="container_image=${{ steps.build.outputs.image_uri }}"
 
       - name: Get Service URL
+        id: get-url
         working-directory: infra/terraform/envs/prod
         run: |
           SERVICE_URL=$(terraform output -raw cloudrun_service_url)
           echo "Deployed successfully to: ${SERVICE_URL}"
+          echo "service_url=${SERVICE_URL}" >> $GITHUB_OUTPUT
+
+  smoke-test-prod:
+    name: Smoke Tests (PROD)
+    runs-on: ubuntu-latest
+    needs: build-deploy-prod
+    environment: PROD
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run smoke tests
+        env:
+          MCP_SERVER_URL: ${{ needs.build-deploy-prod.outputs.service_url }}/sse
+          SA_KEY_B64: ${{ secrets.SA_KEY_B64 }}
+        run: poetry run pytest tests/test_smoke_google_calendar.py -v
