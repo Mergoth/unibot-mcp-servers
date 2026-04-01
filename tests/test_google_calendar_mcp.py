@@ -59,7 +59,7 @@ async def test_list_events():
         main._google_service.reset(token)
 
     assert "Meeting" in result
-    assert "2024-05-20T10:00:00Z" in result
+    assert "Mon 20 May 2024 10:00" in result
 
 
 @pytest.mark.asyncio

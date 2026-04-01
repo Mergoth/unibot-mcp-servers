@@ -96,14 +96,18 @@ def add_calendar(ctx: Context, calendar_id: str) -> str:
 
 
 @mcp.tool
-def list_events(ctx: Context, calendar_id: str = "primary", time_min: Optional[str] = None, time_max: Optional[str] = None, max_results: int = 10) -> str:
-    """List events from a specific calendar. Start time time_min is in RFC3339 format (e.g., 2024-01-01T00:00:00Z). Defaults to current time."""
+def list_events(ctx: Context, calendar_id: str = "primary", time_min: Optional[str] = None, time_max: Optional[str] = None, max_results: int = 20) -> str:
+    """List events from a specific calendar. Defaults to a 1-week window centred on today (±7 days).
+    time_min and time_max are RFC3339 (e.g. 2024-01-01T00:00:00Z) and override the defaults."""
     service = _google_service.get()
     if not service:
         return "Failed to initialize Google Calendar service."
 
+    now = datetime.datetime.utcnow()
     if not time_min:
-        time_min = datetime.datetime.utcnow().isoformat() + 'Z'
+        time_min = (now - datetime.timedelta(days=7)).isoformat() + 'Z'
+    if not time_max:
+        time_max = (now + datetime.timedelta(days=7)).isoformat() + 'Z'
 
     try:
         events_result = service.events().list(
@@ -119,10 +123,20 @@ def list_events(ctx: Context, calendar_id: str = "primary", time_min: Optional[s
         if not events:
             return "No events found."
 
-        lines = [f"Upcoming events for {calendar_id}:"]
+        lines = [f"Events for {calendar_id}:"]
         for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            lines.append(f"- {start}: {event.get('summary', 'No Title')} (ID: {event['id']})")
+            raw_start = event['start'].get('dateTime', event['start'].get('date'))
+            # Format: "Mon 01 Jan 2024 10:00" for datetime, "Mon 01 Jan 2024" for all-day
+            try:
+                if 'T' in raw_start:
+                    dt = datetime.datetime.fromisoformat(raw_start.replace('Z', '+00:00'))
+                    start = dt.strftime('%a %d %b %Y %H:%M')
+                else:
+                    dt = datetime.date.fromisoformat(raw_start)
+                    start = dt.strftime('%a %d %b %Y') + ' (all day)'
+            except ValueError:
+                start = raw_start
+            lines.append(f"- {start}: {event.get('summary', 'No Title')}")
         return "\n".join(lines)
     except HttpError as e:
         return f"Google API Error: {str(e)}"
