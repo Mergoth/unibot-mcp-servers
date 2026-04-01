@@ -97,7 +97,7 @@ def add_calendar(ctx: Context, calendar_id: str) -> str:
 
 @mcp.tool
 def list_events(ctx: Context, calendar_id: str = "primary", time_min: Optional[str] = None, time_max: Optional[str] = None, max_results: int = 20) -> str:
-    """List events from a specific calendar. Defaults to a 1-week window centred on today (±7 days).
+    """List events from a specific calendar. Defaults to past 7 days and next 30 days.
     time_min and time_max are RFC3339 (e.g. 2024-01-01T00:00:00Z) and override the defaults."""
     service = _google_service.get()
     if not service:
@@ -107,7 +107,7 @@ def list_events(ctx: Context, calendar_id: str = "primary", time_min: Optional[s
     if not time_min:
         time_min = (now - datetime.timedelta(days=7)).isoformat() + 'Z'
     if not time_max:
-        time_max = (now + datetime.timedelta(days=7)).isoformat() + 'Z'
+        time_max = (now + datetime.timedelta(days=30)).isoformat() + 'Z'
 
     try:
         events_result = service.events().list(
