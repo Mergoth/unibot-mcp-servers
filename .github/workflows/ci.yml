@@ -135,6 +135,7 @@ jobs:
         env:
           MCP_SERVER_URL: ${{ needs.build-deploy-test.outputs.service_url }}/sse
           SA_KEY_B64: ${{ secrets.SA_KEY_B64 }}
+          SMOKE_CALENDAR_ID: ${{ vars.SMOKE_CALENDAR_ID }}
         run: poetry run pytest tests/test_smoke_google_calendar.py -v
 
   build-deploy-prod:

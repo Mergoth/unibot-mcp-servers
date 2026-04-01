@@ -158,7 +158,21 @@ def create_event(ctx: Context, summary: str, start_time: str, end_time: str, des
 
     try:
         event = service.events().insert(calendarId=calendar_id, body=event_body).execute()
-        return f"Successfully created event: {event.get('summary')}\nLink: {event.get('htmlLink')}"
+        return f"Successfully created event: {event.get('summary')}\nID: {event.get('id')}\nLink: {event.get('htmlLink')}"
+    except HttpError as e:
+        return f"Google API Error: {str(e)}"
+
+
+@mcp.tool
+def delete_event(ctx: Context, event_id: str, calendar_id: str = "primary") -> str:
+    """Delete an event by its ID from a calendar."""
+    service = _google_service.get()
+    if not service:
+        return "Failed to initialize Google Calendar service."
+
+    try:
+        service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+        return f"Successfully deleted event: {event_id}"
     except HttpError as e:
         return f"Google API Error: {str(e)}"
 
