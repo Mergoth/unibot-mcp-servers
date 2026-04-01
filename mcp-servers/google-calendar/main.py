@@ -81,6 +81,21 @@ def list_calendars(ctx: Context) -> str:
 
 
 @mcp.tool
+def add_calendar(ctx: Context, calendar_id: str) -> str:
+    """Add a calendar to the service account's calendar list by its ID (e.g. user@gmail.com).
+    Must be called once per calendar after the calendar has been shared with this service account."""
+    service = _google_service.get()
+    if not service:
+        return "Failed to initialize Google Calendar service."
+
+    try:
+        calendar = service.calendarList().insert(body={'id': calendar_id}).execute()
+        return f"Successfully added calendar: {calendar.get('summary')} (ID: {calendar.get('id')})"
+    except HttpError as e:
+        return f"Google API Error: {str(e)}"
+
+
+@mcp.tool
 def list_events(ctx: Context, calendar_id: str = "primary", time_min: Optional[str] = None, time_max: Optional[str] = None, max_results: int = 10) -> str:
     """List events from a specific calendar. Start time time_min is in RFC3339 format (e.g., 2024-01-01T00:00:00Z). Defaults to current time."""
     service = _google_service.get()
