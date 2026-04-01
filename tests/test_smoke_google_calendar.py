@@ -27,7 +27,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def make_client(url: str) -> Client:
-    return Client(SSETransport(url=url, headers={"X-Google-Service-Account": SA_KEY_B64}))
+    return Client(SSETransport(url=url, headers={"X-Service-Account-Key": SA_KEY_B64}))
 
 
 @pytest.mark.asyncio

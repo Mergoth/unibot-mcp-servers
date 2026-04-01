@@ -21,14 +21,14 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 class GoogleAuthMiddleware(Middleware):
     """
     Strict API Key Auth: Requires the Unibot Agent to pass a Base64-encoded
-    Service Account JSON payload in the X-Google-Service-Account header.
+    Service Account JSON payload in the X-Service-Account-Key header.
     """
     async def __call__(self, context: MiddlewareContext, call_next):
         if context.method == "tools/call":
             ctx = context.fastmcp_context
             try:
                 request = get_http_request()
-                sa_key_b64 = request.headers.get("X-Google-Service-Account")
+                sa_key_b64 = request.headers.get("X-Service-Account-Key")
             except RuntimeError:
                 raise Exception("Unauthorized: Missing Request Context.")
 
