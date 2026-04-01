@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastmcp import FastMCP, Context
 from fastmcp.server.middleware import Middleware, MiddlewareContext
+from fastmcp.server.dependencies import get_http_request
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -25,22 +26,23 @@ class GoogleAuthMiddleware(Middleware):
     async def __call__(self, context: MiddlewareContext, call_next):
         if context.method == "tools/call":
             ctx = context.fastmcp_context
-            if ctx.request_context and ctx.request_context.request:
-                sa_key_b64 = ctx.request_context.request.headers.get("X-Google-Service-Account")
-                
-                if not sa_key_b64:
-                    raise Exception("Unauthorized: Missing X-Google-Service-Account header.")
-                
-                try:
-                    sa_key_json = base64.b64decode(sa_key_b64).decode('utf-8')
-                    sa_info = json.loads(sa_key_json)
-                    creds = service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
-                    ctx.google_service = build('calendar', 'v3', credentials=creds)
-                except Exception as e:
-                    logger.error(f"Failed to parse or authenticate Service Account: {e}")
-                    raise Exception(f"Unauthorized: Invalid X-Google-Service-Account payload ({e})")
-            else:
-                 raise Exception("Unauthorized: Missing Request Context.")
+            try:
+                request = get_http_request()
+                sa_key_b64 = request.headers.get("X-Google-Service-Account")
+            except RuntimeError:
+                raise Exception("Unauthorized: Missing Request Context.")
+
+            if not sa_key_b64:
+                raise Exception("Unauthorized: Missing X-Google-Service-Account header.")
+
+            try:
+                sa_key_json = base64.b64decode(sa_key_b64).decode('utf-8')
+                sa_info = json.loads(sa_key_json)
+                creds = service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
+                ctx.google_service = build('calendar', 'v3', credentials=creds)
+            except Exception as e:
+                logger.error(f"Failed to parse or authenticate Service Account: {e}")
+                raise Exception(f"Unauthorized: Invalid X-Google-Service-Account payload ({e})")
 
         return await call_next(context)
 
