@@ -10,6 +10,8 @@ on:
       - 'pyproject.toml'
       - 'poetry.lock'
       - 'src/**'
+  pull_request:
+    branches: [ master, development ]
 
 env:
   PYTHON_VERSION: "3.12"
