@@ -17,6 +17,8 @@ async def test_list_tools():
     assert "list_calendars" in tool_names
     assert "list_events" in tool_names
     assert "create_event" in tool_names
+    assert "update_event" in tool_names
+    assert "delete_event" in tool_names
 
 
 @pytest.mark.asyncio
@@ -83,3 +85,36 @@ async def test_create_event():
 
     assert "Successfully created event: New Event" in result
     assert "http://calendar.google.com/event" in result
+
+
+@pytest.mark.asyncio
+async def test_update_event():
+    """Test update_event tool with mocked Google API."""
+    mock_service = MagicMock()
+    mock_service.events().patch().execute.return_value = {
+        'summary': 'Updated Event',
+        'id': 'evt1',
+        'htmlLink': 'http://calendar.google.com/event',
+    }
+    token = main._google_service.set(mock_service)
+    try:
+        result = main.update_event(
+            ctx=None,
+            event_id="evt1",
+            summary="Updated Event",
+            attendees=["alice@example.com"],
+            reminder_minutes=[10, 30],
+        )
+    finally:
+        main._google_service.reset(token)
+
+    assert "Successfully updated event: Updated Event" in result
+    # Verify patch was called with correct body
+    call_kwargs = mock_service.events().patch.call_args.kwargs
+    assert call_kwargs['eventId'] == 'evt1'
+    body = call_kwargs['body']
+    assert body['summary'] == 'Updated Event'
+    assert body['attendees'] == [{'email': 'alice@example.com'}]
+    assert body['reminders']['useDefault'] is False
+    assert {'method': 'popup', 'minutes': 10} in body['reminders']['overrides']
+    assert {'method': 'popup', 'minutes': 30} in body['reminders']['overrides']

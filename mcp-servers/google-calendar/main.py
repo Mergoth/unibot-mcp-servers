@@ -81,6 +81,34 @@ def list_calendars(ctx: Context) -> str:
 
 
 @mcp.tool
+def create_calendar(ctx: Context, summary: str) -> str:
+    """Create a new calendar owned by the service account. Returns its calendar ID."""
+    service = _google_service.get()
+    if not service:
+        return "Failed to initialize Google Calendar service."
+
+    try:
+        calendar = service.calendars().insert(body={'summary': summary}).execute()
+        return f"Successfully created calendar: {calendar.get('summary')}\nID: {calendar.get('id')}"
+    except HttpError as e:
+        return f"Google API Error: {str(e)}"
+
+
+@mcp.tool
+def delete_calendar(ctx: Context, calendar_id: str) -> str:
+    """Permanently delete a calendar owned by the service account."""
+    service = _google_service.get()
+    if not service:
+        return "Failed to initialize Google Calendar service."
+
+    try:
+        service.calendars().delete(calendarId=calendar_id).execute()
+        return f"Successfully deleted calendar: {calendar_id}"
+    except HttpError as e:
+        return f"Google API Error: {str(e)}"
+
+
+@mcp.tool
 def add_calendar(ctx: Context, calendar_id: str) -> str:
     """Add a calendar to the service account's calendar list by its ID (e.g. user@gmail.com).
     Must be called once per calendar after the calendar has been shared with this service account."""
@@ -159,6 +187,55 @@ def create_event(ctx: Context, summary: str, start_time: str, end_time: str, des
     try:
         event = service.events().insert(calendarId=calendar_id, body=event_body).execute()
         return f"Successfully created event: {event.get('summary')}\nID: {event.get('id')}\nLink: {event.get('htmlLink')}"
+    except HttpError as e:
+        return f"Google API Error: {str(e)}"
+
+
+@mcp.tool
+def update_event(
+    ctx: Context,
+    event_id: str,
+    calendar_id: str = "primary",
+    summary: Optional[str] = None,
+    description: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    attendees: Optional[list[str]] = None,
+    reminder_minutes: Optional[list[int]] = None,
+) -> str:
+    """Update an existing calendar event. Only provided fields are changed.
+    attendees: list of email addresses to invite.
+    reminder_minutes: list of minutes before the event to send a popup reminder (e.g. [10, 30]).
+    Times are RFC3339 (e.g. 2024-05-20T10:00:00Z)."""
+    service = _google_service.get()
+    if not service:
+        return "Failed to initialize Google Calendar service."
+
+    patch: dict = {}
+    if summary is not None:
+        patch['summary'] = summary
+    if description is not None:
+        patch['description'] = description
+    if start_time is not None:
+        patch['start'] = {'dateTime': start_time}
+    if end_time is not None:
+        patch['end'] = {'dateTime': end_time}
+    if attendees is not None:
+        patch['attendees'] = [{'email': email} for email in attendees]
+    if reminder_minutes is not None:
+        patch['reminders'] = {
+            'useDefault': False,
+            'overrides': [{'method': 'popup', 'minutes': m} for m in reminder_minutes],
+        }
+
+    if not patch:
+        return "Nothing to update — no fields provided."
+
+    try:
+        event = service.events().patch(
+            calendarId=calendar_id, eventId=event_id, body=patch
+        ).execute()
+        return f"Successfully updated event: {event.get('summary')}\nID: {event.get('id')}\nLink: {event.get('htmlLink')}"
     except HttpError as e:
         return f"Google API Error: {str(e)}"
 
