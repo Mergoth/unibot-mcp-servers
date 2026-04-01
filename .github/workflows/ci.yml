@@ -1,21 +1,14 @@
-name: Build and Deploy Google Calendar MCP
+name: Build and Deploy MCP Servers
 
 on:
   push:
     branches: [ master, development ]
-    paths:
-      - 'mcp-servers/google-calendar/**'
-      - '.github/workflows/**'
-      - 'infra/terraform/**'
-      - 'pyproject.toml'
-      - 'poetry.lock'
-      - 'src/**'
   pull_request:
     branches: [ master, development ]
 
 env:
   PYTHON_VERSION: "3.12"
-  APP_NAME: "google-calendar-mcp"
+  APP_NAME: "unibot-mcp-servers"
   SERVICE_PATH: "mcp-servers/google-calendar"
 
 jobs:
@@ -50,7 +43,7 @@ jobs:
     name: Build & Deploy to TEST
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/development'
+    if: github.ref == 'refs/heads/development' || github.event_name == 'pull_request'
     environment: TEST
     permissions:
       contents: read
