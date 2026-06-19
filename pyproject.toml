@@ -10,11 +10,13 @@ authors = [{ name = "Mergoth" }]
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "mcp>=1.2.0",
-    "httpx>=0.28.1",
+    "fastmcp>=3.0.0",
     "pyyaml>=6.0.0",
     "pydantic>=2.10.0",
     "fastapi (>=0.137.2,<0.138.0)",
+    "google-api-python-client (>=2.190.0,<3.0.0)",
+    "google-auth (>=2.48.0,<3.0.0)",
+    "google-auth-httplib2 (>=0.3.0,<0.4.0)",
 ]
 
 [tool.poetry]
@@ -25,7 +27,7 @@ packages = [
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 pytest-asyncio = "^0.23.0"
-uvicorn = "^0.34.0"
+python-dotenv = "^1.2.2"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

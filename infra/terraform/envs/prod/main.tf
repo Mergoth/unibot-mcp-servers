@@ -44,15 +44,7 @@ module "cloudrun" {
   min_instances         = var.cloudrun_min_instances
   max_instances         = var.cloudrun_max_instances
   
-  allow_public_access   = true # MCP servers might need to be public or protected by auth header, assuming public for now as per minimal viable setup or strict IP
+  allow_public_access   = true # MCP server relies on IAM auth
 
-  env_vars = {
-    PORT = "8080"
-  }
-  
-  # Note: To enable Service Account Key Auth as per user request:
-  # 1. Provide GOOGLE_APPLICATION_CREDENTIALS path in env_vars
-  # 2. Add the file content as a Secret in GCP
-  # 3. Use secret_env_vars to map it (but this module supports env vars, not file mounts)
-  # For now, we deploy the infrastructure. The user must manually configure the secret and update this file or use ADC.
+  env_vars = {}
 }

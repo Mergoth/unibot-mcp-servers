@@ -48,25 +48,12 @@ resource "google_cloud_run_v2_service" "api" {
 
       # Startup probe
       startup_probe {
-        http_get {
-          path = "/sse"  # Changed from /health because /sse is a GET endpoint on the MCP server
+        tcp_socket {
           port = 8080
         }
         initial_delay_seconds = 10
         timeout_seconds       = 3
         period_seconds        = 10
-        failure_threshold     = 3
-      }
-
-      # Liveness probe
-      liveness_probe {
-        http_get {
-          path = "/sse"  # Changed from /health
-          port = 8080
-        }
-        initial_delay_seconds = 30
-        timeout_seconds       = 3
-        period_seconds        = 30
         failure_threshold     = 3
       }
     }
