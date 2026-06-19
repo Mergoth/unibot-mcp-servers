@@ -1,0 +1,8 @@
+mcp>=1.2.0
+fastapi
+uvicorn
+pydantic
+httpx
+sse-starlette
+starlette
+anyio
