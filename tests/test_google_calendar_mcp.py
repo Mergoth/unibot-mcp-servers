@@ -3,7 +3,10 @@ import os
 import pytest
 from unittest.mock import MagicMock
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../mcp-servers/google-calendar')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../mcp-servers/google-calendar')))
+
+# Remove any previously cached 'main' module to prevent namespace clashing in pytest
+sys.modules.pop("main", None)
 
 import main
 

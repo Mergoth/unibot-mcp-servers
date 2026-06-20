@@ -6,7 +6,10 @@ import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Add the server directory to path to allow importing 'main'
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../mcp-servers/save-lead')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../mcp-servers/save-lead')))
+
+# Remove any previously cached 'main' module to prevent namespace clashing in pytest
+sys.modules.pop("main", None)
 
 import main
 import mcp.types as types
