@@ -2,9 +2,9 @@ name: Build and Deploy MCP Servers
 
 on:
   push:
-    branches: [ master, development ]
+    branches: [ main, development ]
   pull_request:
-    branches: [ master, development ]
+    branches: [ main, development ]
 
 env:
   PYTHON_VERSION: "3.12"
@@ -43,7 +43,7 @@ jobs:
     name: Build & Deploy to TEST
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/development' || github.event_name == 'pull_request'
+    if: github.ref == 'refs/heads/development'
     environment: TEST
     permissions:
       contents: read
