@@ -41,17 +41,19 @@ class SaveLeadInput(BaseModel):
             elif isinstance(val, str):
                 data[field] = val.strip()
 
-        # Coerce industry
+        # Validate industry (no silent coercion)
         industry = data.get("industry")
-        valid_industries = {"restaurant", "vet_clinic", "auto_shop", "gestoria", "generic"}
-        if not isinstance(industry, str) or industry not in valid_industries:
-            data["industry"] = "generic"
+        if industry is not None:
+            valid_industries = {"restaurant", "vet_clinic", "auto_shop", "gestoria", "generic"}
+            if not isinstance(industry, str) or industry not in valid_industries:
+                raise ValueError(f"Invalid industry: '{industry}'. Must be one of {sorted(list(valid_industries))}.")
             
-        # Coerce language
+        # Validate language (no silent coercion)
         language = data.get("language")
-        valid_languages = {"en", "es"}
-        if not isinstance(language, str) or language not in valid_languages:
-            data["language"] = "en"
+        if language is not None:
+            valid_languages = {"en", "es"}
+            if not isinstance(language, str) or language not in valid_languages:
+                raise ValueError(f"Invalid language: '{language}'. Must be one of {sorted(list(valid_languages))}.")
             
         return data
 
@@ -216,7 +218,7 @@ async def call_tool(
             )
         ]
 
-    # 2. Pydantic validation & coercion
+    # 2. Pydantic validation
     try:
         lead = SaveLeadInput.model_validate(arguments)
     except Exception as e:
@@ -225,8 +227,8 @@ async def call_tool(
             types.TextContent(
                 type="text",
                 text=json.dumps({
-                    "status": "needs_contact",
-                    "message": "Contact missing or invalid — ask the visitor for an email or phone."
+                    "status": "error",
+                    "message": f"Validation error: {e}"
                 })
             )
         ]

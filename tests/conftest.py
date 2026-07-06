@@ -32,7 +32,7 @@ def mcp_server_url():
     Otherwise, starts a local FastMCP server for the duration of the test session.
     """
     url = os.getenv("MCP_SERVER_URL")
-    if url:
+    if url and "save-lead" not in url:
         yield url
         return
 
