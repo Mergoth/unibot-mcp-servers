@@ -182,11 +182,11 @@ def list_events(
     """List events from a calendar. Defaults to past 7 days and next 30 days.
     time_min / time_max are RFC3339 (e.g. 2024-01-01T00:00:00Z)."""
     service = _get_service()
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.UTC)
     if not time_min:
-        time_min = (now - datetime.timedelta(days=7)).isoformat() + 'Z'
+        time_min = (now - datetime.timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
     if not time_max:
-        time_max = (now + datetime.timedelta(days=30)).isoformat() + 'Z'
+        time_max = (now + datetime.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     try:
         result = service.events().list(

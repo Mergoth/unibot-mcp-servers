@@ -59,7 +59,7 @@ async def test_list_calendars_returns_result(mcp_server_url):
 @pytest.mark.asyncio
 async def test_full_calendar_and_event_lifecycle(mcp_server_url):
     """Creates a scratch calendar, runs full event CRUD inside it, then deletes the calendar."""
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.UTC)
     cal_name = f"[smoke-test] {now.strftime('%Y%m%d%H%M%S')}"
     start = (now + datetime.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     end = (now + datetime.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")

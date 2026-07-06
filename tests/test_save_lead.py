@@ -75,8 +75,8 @@ async def test_validation_valid_contact(mock_send_email):
 
 @pytest.mark.asyncio
 @patch("main.send_lead_email", new_callable=AsyncMock)
-async def test_enum_coercion(mock_send_email):
-    """Verify that invalid enum values for industry and language are coerced."""
+async def test_enum_validation(mock_send_email):
+    """Verify that invalid enum values for industry and language fail validation."""
     mock_send_email.return_value = True
     
     # Test invalid industry and language
@@ -88,12 +88,10 @@ async def test_enum_coercion(mock_send_email):
     result = await main.handle_call_tool("save_lead", arguments)
     assert len(result) == 1
     data = json.loads(result[0].text)
-    assert data["status"] == "ok"
-    
-    # Check that the coerced values were passed to the email sender
-    called_lead = mock_send_email.call_args[0][0]
-    assert called_lead.industry == "generic"
-    assert called_lead.language == "en"
+    assert data["status"] == "error"
+    assert "Validation error" in data["message"]
+    assert "industry" in data["message"] or "language" in data["message"]
+    mock_send_email.assert_not_called()
 
 @pytest.mark.asyncio
 @patch("main.send_lead_email", new_callable=AsyncMock)
