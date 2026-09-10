@@ -81,3 +81,9 @@ variable "secret_env_vars" {
   type        = map(string)
   default     = {}
 }
+
+variable "health_check_path" {
+  description = "HTTP path for Cloud Run startup/liveness probes"
+  type        = string
+  default     = "/sse"
+}
